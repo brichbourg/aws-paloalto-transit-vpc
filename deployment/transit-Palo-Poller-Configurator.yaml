@@ -1,0 +1,226 @@
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Palo Alto Transit VPC Poller and Configurator Functions 
+Mappings:
+  Function:
+    General:
+      S3Bucket: source-bucket-base-name-us-east-1    #edit to match base stack (The bucket you created manually)
+      VPNConfigBucketName: pan-base-stack-vpn-bucket-name #This is the bucket that was created by the base CFn template
+      VPNConfigPrefix: vpnconfigs/
+      FunctionSecurityGroupName: sg-aabbccdd #edit to match base stack - it will have the description Transit VPC Automation Security Group
+    Configurator:
+      S3Key: transit-vpc/latest/transit-vpc-push-pan-config.zip 
+      Name: palo-configurator 
+      Handler: transit_vpc_push_pan_config/lambda_function.lambda_handler 
+      Description: >-
+        Transit VPC: This function is invoked when a generic VPN configuration
+        is placed in an S3 bucket - it converts the generic information into
+        Palo Alto firewall specific commands and pushes the config to transit VPC
+        routers.
+      Runtime: python2.7 
+      Timeout: '300'  
+      MemorySize: '128' 
+      ConfiguratorIAMRoleName: <ARN Value of PaloAltoConfigFunctionRole> #edit to match the arn of the role
+      ConfiguratorSubnet1: subnet-aabbccdd #edit to match base stack - these are the subnets Lambda will use to SSH to the Palo Altos
+      ConfiguratorSubnet2: subnet-aabbccdd #edit to match base stack - ditto
+      SolutionHelperName: <ARN Value of SolutionHelper Lambda function> #edit to match the arn of the Solution Helper Lambda function created in the base stack
+      VPNConfigBucketName: pan-base-stack-vpnconfigs3bucket-12abdefghijk #edit to match base stack - this is the bucket that was created automatically by the first stack, not the bucket you created manually.
+      VPNConfigPrefix: vpnconfigs/
+    Poller:
+      S3Key: transit-vpc/latest/transit-vpc-poller.zip
+      Name: palo-vgw-poller
+      Handler: transit-vpc-poller.lambda_handler 
+      Description: >-
+        Transit VPC: Poller function responsible for identifying specifically
+        tagged VGWs and creating VPN connections to transit VPC.
+      Runtime: python2.7 
+      Timeout: '120' 
+      MemorySize: '128'
+      PollerIAMRoleName: <ARN Value of TransitVpcPollerRole>  #edit to what the match base stack deployed
+Resources:
+  PaloConfigFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Join 
+        - '-'
+        - - !Ref 'AWS::StackName'
+          - !FindInMap 
+            - Function
+            - Configurator
+            - Name
+      Code:
+        S3Bucket: !FindInMap 
+          - Function
+          - General
+          - S3Bucket
+        S3Key: !FindInMap 
+          - Function
+          - Configurator
+          - S3Key
+      MemorySize: !FindInMap 
+        - Function
+        - Configurator
+        - MemorySize
+      Handler: !FindInMap 
+        - Function
+        - Configurator
+        - Handler
+      Role: !FindInMap
+        - Function
+        - Configurator
+        - ConfiguratorIAMRoleName
+      Timeout: !FindInMap 
+        - Function
+        - Configurator
+        - Timeout
+      Runtime: !FindInMap 
+        - Function
+        - Configurator
+        - Runtime
+      Description: !FindInMap 
+        - Function
+        - Configurator
+        - Description
+      VpcConfig:
+        SecurityGroupIds:
+          - !FindInMap
+            - Function
+            - General
+            - FunctionSecurityGroupName
+        SubnetIds:
+          - !FindInMap
+            - Function
+            - Configurator
+            - ConfiguratorSubnet1
+          - !FindInMap
+            - Function
+            - Configurator
+            - ConfiguratorSubnet2
+      Environment:
+        Variables:
+          CONFIG_FILE: transit_vpc_config.txt
+          LOG_LEVEL: INFO
+  PaloConfigS3Event:
+      Type: 'Custom::LoadLambda'
+      DependsOn: PaloConfigFunction
+      Properties:
+        ServiceToken: !FindInMap
+          - Function
+          - Configurator
+          - SolutionHelperName
+        FunctionName: !Join 
+          - '-'
+          - - !Ref 'AWS::StackName'
+            - !FindInMap 
+              - Function
+              - Configurator
+              - Name
+        LambdaArn: !GetAtt 
+          - PaloConfigFunction
+          - Arn
+        S3Event: !Join 
+          - ''
+          - - '{ ''Bucket'' : '''
+            - !FindInMap
+              - Function
+              - General
+              - VPNConfigBucketName
+            - ''', '
+            - '''EventPattern'' : {'
+            - '''LambdaFunctionConfigurations'' : [ {'
+            - '''LambdaFunctionArn'': '''
+            - !GetAtt 
+              - PaloConfigFunction
+              - Arn
+            - ''','
+            - '''Events'': [''s3:ObjectCreated:Put'' ],'
+            - '''Filter'': {'
+            - '''Key'': {'
+            - '''FilterRules'': [ {'
+            - '''Name'': ''prefix'','
+            - '''Value'': '''
+            - !FindInMap
+              - Function
+              - General
+              - VPNConfigPrefix
+            - ''''
+            - '}, {'
+            - '''Name'': ''suffix'','
+            - '''Value'': ''.conf'''
+            - '} ] } }'
+            - '} ] }'
+            - '}'
+
+  VPGPollerFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: !Join 
+        - '-'
+        - - !Ref 'AWS::StackName'
+          - !FindInMap 
+            - Function
+            - Poller
+            - Name
+      Code:
+        S3Bucket: !FindInMap 
+          - Function
+          - General
+          - S3Bucket
+        S3Key: !FindInMap 
+          - Function
+          - Poller
+          - S3Key
+      MemorySize: !FindInMap 
+        - Function
+        - Poller
+        - MemorySize
+      Handler: !FindInMap 
+        - Function
+        - Poller
+        - Handler
+      Role: !FindInMap
+        - Function
+        - Poller
+        - PollerIAMRoleName
+      Timeout: !FindInMap 
+        - Function
+        - Poller
+        - Timeout
+      Runtime: !FindInMap 
+        - Function
+        - Poller
+        - Runtime
+      Description: !FindInMap 
+        - Function
+        - Poller
+        - Description
+      Environment:
+        Variables:
+          BUCKET_NAME: !FindInMap
+            - Function
+            - General
+            - VPNConfigBucketName
+          BUCKET_PREFIX: !FindInMap
+            - Function
+            - General
+            - VPNConfigPrefix
+          CONFIG_FILE: transit_vpc_config.txt
+          LOG_LEVEL: INFO
+
+  PollerEvent: #you need to manually tied this in the console to the Poller Lambda function
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: >-
+        Transit VPC: Rule to trigger VGW-Poller every minute to find VGWs that
+        need to be attached to the transit VPC.
+      ScheduleExpression: cron(* * * * ? *)
+      State: ENABLED
+      Targets:
+        - Id: !Join 
+            - '-'
+            - - !Ref 'AWS::StackName'
+              - VGW-Poller-1min
+          Arn: !GetAtt 
+            - VPGPollerFunction
+            - Arn
+

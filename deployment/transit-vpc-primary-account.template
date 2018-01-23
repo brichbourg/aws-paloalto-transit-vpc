@@ -39,34 +39,34 @@
     "VpcCidr":{
       "Description":"CIDR block for Transit VPC.",
       "Type":"String",
-      "Default":"200.0.0.0/16"
+      "Default":"100.0.0.0/16"
     },
     "PubSubnet11":{
       "Description":"Address range for Transit VPC subnet to be created in AZ1.",
       "Type":"String",
-      "Default":"200.0.254.0/24"
+      "Default":"100.0.254.0/24"
     },
     "PubSubnet12":{
       "Description":"Address range for Transit VPC subnet to be created in AZ1.",
       "Type":"String",
-      "Default":"200.0.1.0/24"
+      "Default":"100.0.1.0/24"
     },
     "PubSubnet21":{
       "Description":"Address range for Transit VPC subnet to be created in AZ2.",
       "Type":"String",
-      "Default":"200.0.253.0/24"
+      "Default":"100.0.253.0/24"
     },
     "PubSubnet22":{
       "Description":"Address range for Transit VPC subnet to be created in AZ2.",
       "Type":"String",
-      "Default":"200.0.2.0/24"
+      "Default":"100.0.2.0/24"
     },
     "PAVMType":{
-      "Description":"Maximum network througput required for PA instances.",
+      "Description":"Modifed for testing a cheaper instance (m4.xlarge).",
       "Type":"String",
-      "Default":"c4.2xlarge",
+      "Default":"m4.xlarge",
       "AllowedValues":[
-        "c4.2xlarge"
+        "m4.xlarge"
       ]
     },
     "LicenseModel":{
@@ -319,7 +319,7 @@
         "LicenseIncluded":"ami-e43df48b"
       },
       "us-east-1":{
-        "BYOL":"ami-f22cd7e4",
+        "BYOL":"ami-493c7233",
         "LicenseIncluded":"ami-4222d954"
       },
       "us-east-2":{
@@ -336,8 +336,8 @@
       }
     },
     "PAVMInstance":{
-      "c4.2xlarge":{
-        "Type":"c4.2xlarge",
+      "m4.xlarge":{
+        "Type":"m4.xlarge",
         "Bandwidth":"500000"
       }
     }
